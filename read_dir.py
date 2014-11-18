@@ -21,17 +21,12 @@ def list_files(startpath):
                     print '%s%s: %s' % (subindent, filename, h)
 
 
-def sha256_for_file(path, block_size=256 * 128):
-    '''
-    Block size directly depends on the block size of your filesystem
-    to avoid performances issues
-    Here I have blocks of 4096 octets (Default NTFS)
-    '''
-    sha256 = hashlib.sha256()
+def sha256_for_file(path, block_size=4096):
+    h = hashlib.sha256()
     with open(path, 'rb') as f:
         for chunk in iter(lambda: f.read(block_size), b''):
-            sha256.update(chunk)
-    return sha256.hexdigest()
+            h.update(chunk)
+    return h.hexdigest()
 
 if __name__ == '__main__':
     list_files('root')
