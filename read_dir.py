@@ -7,13 +7,18 @@ import hashlib
 def list_files(startpath):
     for path, dirs, files in os.walk(unicode(startpath)):
         level = path.replace(startpath, '').count(os.sep)
-        indent = ' ' * 4 * (level)
-        print '{}{}/'.format(indent, os.path.basename(path))
-        subindent = ' ' * 4 * (level + 1)
+        indent = u'\xb7' * 2 *  (level)
+        print '%s%s/' % (indent, os.path.basename(path))
+        subindent = u'\xb7' * 2 * (level + 1)
         for f in files:
-            fname = os.path.join(path, f)
-            fname_hash = sha256_for_file(fname)
-            print '{}{}'.format(subindent, f), ': ',  fname_hash
+            filename = os.path.join(path, f)
+            if os.path.isfile(filename):
+                try:
+                    h = sha256_for_file(filename)
+                except Exception as e:
+                    print e
+                else:
+                    print '%s%s: %s' % (subindent, filename, h)
 
 
 def sha256_for_file(path, block_size=256 * 128):
