@@ -1,0 +1,5 @@
+*.py[cod]
+*.log
+*.pyc
+*.sqlite
+*.db
