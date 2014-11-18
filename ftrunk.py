@@ -1,7 +1,8 @@
 import hashlib
+import itertools
+import operator
 import os
 import sqlite3
-import sys
 import time
 
 
@@ -14,7 +15,14 @@ class Ftrunk(object):
         c.execute('PRAGMA synchronous=OFF')
         c.execute('PRAGMA temp_store=MEMORY')
         c.execute('PRAGMA journal_mode=MEMORY')
-        c.execute('CREATE TABLE IF NOT EXISTS trunk (key text, value text)')
+        query = """CREATE TABLE IF NOT EXISTS trunk (
+            hash text,
+            file text,
+            PRIMARY KEY(hash)
+        )"""
+        c.execute(query)
+        c.execute('SELECT EXISTS (SELECT 1 FROM trunk)')
+        self.is_empty = False if c.fetchone()[0] else True
         self.connection.commit()
         self.lst = list()
 
@@ -37,10 +45,16 @@ class Ftrunk(object):
         return h.hexdigest()
 
     def read_dir(self, path):
+        print self.is_empty
         # for path, dirs, files in os.walk(os.path.expanduser(".")):
         # for path, dirs, files in os.walk(os.path.expanduser("~")):
         for path, _, files in os.walk(unicode(path)):
-            self.put(os.path.join(path), 'dir')
+            current_path = os.path.join(path)
+            if current_path in itertools.imap(
+                    operator.itemgetter(0),
+                    self.lst):
+                print 'current_path in list'
+            self.put(current_path, current_path)
             for f in files:
                 filename = os.path.join(path, f)
                 if os.path.isfile(filename):
