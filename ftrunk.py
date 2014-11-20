@@ -8,7 +8,7 @@ import time
 
 class Ftrunk(object):
 
-    def __init__(self, filename='data.ftrunk'):
+    def __init__(self, filename='ftrunk.db'):
         self.connection = sqlite3.connect(filename)
         self.connection.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
         c = self.connection.cursor()
