@@ -8,8 +8,12 @@ import time
 
 class Ftrunk(object):
 
-    def __init__(self, filename='map.ftrunk'):
-        self.connection = sqlite3.connect(filename)
+    def __init__(self, path):
+        self.path = os.path.abspath(os.path.expanduser(path))
+        if not os.path.isdir(self.path):
+            return
+        self.trunkname = os.path.basename(path)
+        self.connection = sqlite3.connect('%s.ftrunk' % self.trunkname)
         self.connection.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
         c = self.connection.cursor()
         c.execute('PRAGMA synchronous=OFF')
@@ -21,6 +25,13 @@ class Ftrunk(object):
             PRIMARY KEY(hash)
         )"""
         c.execute(query)
+        query = """CREATE TABLE IF NOT EXISTS config (
+            key text,
+            value text,
+            PRIMARY KEY(key)
+        )"""
+        c.execute(query)
+        c.execute('INSERT INTO config VALUES(?, ?)', ('root', self.trunkname))
         c.execute('SELECT EXISTS (SELECT 1 FROM trunk)')
         self.is_empty = False if c.fetchone()[0] else True
         self.connection.commit()
@@ -45,16 +56,16 @@ class Ftrunk(object):
         return h.hexdigest()
 
     def read_dir(self, path):
-        print self.is_empty
         # for path, dirs, files in os.walk(os.path.expanduser(".")):
         # for path, dirs, files in os.walk(os.path.expanduser("~")):
-        for path, _, files in os.walk(unicode(path)):
-            current_path = os.path.join(path)
+        for path, _, files in os.walk(path):
+            current_path = os.path.join(path)[len(self.path):]
             if current_path in itertools.imap(
                     operator.itemgetter(0),
                     self.lst):
                 print 'current_path in list'
-            self.put(current_path, current_path)
+            if current_path:
+                self.put(current_path, current_path)
             for f in files:
                 filename = os.path.join(path, f)
                 if os.path.isfile(filename):
@@ -65,12 +76,12 @@ class Ftrunk(object):
                     else:
                         self.put(h, filename)
         c = self.connection.cursor()
-        c.executemany("INSERT INTO trunk VALUES (?, ?)", self.lst)
+        c.executemany('INSERT INTO trunk VALUES (?, ?)', self.lst)
         self.connection.commit()
 
 
 if __name__ == '__main__':
     time_start = time.time()
-    ftrunk = Ftrunk()
-    ftrunk.read_dir('root')
+    ftrunk = Ftrunk('root')
+    ftrunk.read_dir(ftrunk.path)
     print time.time() - time_start
