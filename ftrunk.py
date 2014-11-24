@@ -65,7 +65,7 @@ class Ftrunk(object):
                     self.lst):
                 print 'current_path in list'
             if current_path:
-                self.put(current_path, current_path)
+                self.put(current_path, 'dir')
             for f in files:
                 filename = os.path.join(path, f)
                 if os.path.isfile(filename):
