@@ -1,11 +1,8 @@
 import hashlib
-import itertools
-import operator
+import json
 import os
 import sqlite3
 import time
-
-from datetime import datetime
 
 
 class Ftrunk(object):
@@ -15,6 +12,7 @@ class Ftrunk(object):
         if not os.path.isdir(self.path):
             return
         self.trunkname = os.path.basename(path)
+        self.version = int(time.time())
         self.connection = sqlite3.connect('%s.ftrunk' % self.trunkname)
         self.connection.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
         c = self.connection.cursor()
@@ -24,23 +22,22 @@ class Ftrunk(object):
         query = """CREATE TABLE IF NOT EXISTS trunk (
             hash text,
             file text,
-            cdate text,
-            PRIMARY KEY(hash)
+            version integer,
+            UNIQUE(hash, version) ON CONFLICT REPLACE
         )"""
         c.execute(query)
         query = """CREATE TABLE IF NOT EXISTS config (
             key text,
             value text,
-            cdate text,
+            version integer,
             PRIMARY KEY(key)
         )"""
         c.execute(query)
         c.execute('INSERT OR REPLACE INTO config values(?, ?, ?)',
-                  ('root', self.trunkname, datetime.utcnow()))
-        c.execute('SELECT EXISTS (SELECT 1 FROM trunk)')
-        self.is_empty = False if c.fetchone()[0] else True
+                  ('root', self.trunkname, self.version))
+        #c.execute('SELECT EXISTS (SELECT 1 FROM trunk)')
         self.connection.commit()
-        self.lst = list()
+        self.trunk = {}
 
     def get(self, key):
         c = self.connection.cursor()
@@ -50,9 +47,6 @@ class Ftrunk(object):
             raise KeyError(key)
         return value[1]
 
-    def put(self, key, value):
-        self.lst.append((key, value, datetime.utcnow()))
-
     def sha256_for_file(self, path, block_size=4096):
         h = hashlib.sha256()
         with open(path, 'rb') as f:
@@ -61,17 +55,10 @@ class Ftrunk(object):
         return h.hexdigest()
 
     def read_dir(self, path):
-        # for path, dirs, files in os.walk(os.path.expanduser(".")):
-        # for path, dirs, files in os.walk(os.path.expanduser("~")):
         for path, _, files in os.walk(path):
             current_path = os.path.join(path)[len(self.path):]
-            if current_path in itertools.imap(
-                    operator.itemgetter(0),
-                    self.lst):
-                print 'current_path in list'
-#            continue
             if current_path:
-                self.put(current_path, 'dir')
+                self.trunk[current_path] = None
             for f in files:
                 filename = os.path.join(path, f)
                 if os.path.isfile(filename):
@@ -80,14 +67,31 @@ class Ftrunk(object):
                     except Exception as e:
                         print e
                     else:
-                        self.put(h, filename[len(self.path):])
+                        filename = filename[len(self.path):]
+                        exists = self.trunk.get(h, False)
+                        if exists:
+                            print 'hash: %s in trunk' % h
+                            try:
+                                files = json.loads(exists)
+                            except Exception:
+                                files = [exists]
+
+                            files.append(filename)
+                            self.trunk[h] = json.dumps(files)
+                        else:
+                            self.trunk[h] = filename
+
+    def save(self):
         c = self.connection.cursor()
-        c.executemany('INSERT INTO trunk VALUES (?, ?, ?)', self.lst)
-        self.connection.commit()
+        c.executemany(
+            'INSERT INTO trunk VALUES (?, ?, ?)',
+            [(k, v, self.version) for k, v in self.trunk.iteritems()])
+        return self.connection.commit()
 
 
 if __name__ == '__main__':
     time_start = time.time()
     ftrunk = Ftrunk('root')
     ftrunk.read_dir(ftrunk.path)
+    ftrunk.save()
     print time.time() - time_start
