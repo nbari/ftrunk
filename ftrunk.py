@@ -22,6 +22,7 @@ class Ftrunk(object):
         query = """CREATE TABLE IF NOT EXISTS trunk (
             hash text,
             file text,
+            size integer,
             version integer,
             UNIQUE(hash, version) ON CONFLICT REPLACE
         )"""
@@ -49,43 +50,46 @@ class Ftrunk(object):
 
     def sha256_for_file(self, path, block_size=4096):
         h = hashlib.sha256()
+        s = 0
         with open(path, 'rb') as f:
             for chunk in iter(lambda: f.read(block_size), b''):
+                s += len(chunk)
                 h.update(chunk)
-        return h.hexdigest()
+        return (h.hexdigest(), s)
 
     def read_dir(self, path):
         for path, _, files in os.walk(path):
             current_path = os.path.join(path)[len(self.path):]
             if current_path:
-                self.trunk[current_path] = None
+                self.trunk[current_path] = (None, 0)
             for f in files:
                 filename = os.path.join(path, f)
                 if os.path.isfile(filename):
                     try:
-                        h = self.sha256_for_file(filename)
+                        h, size = self.sha256_for_file(filename)
                     except Exception as e:
                         print e
                     else:
                         filename = filename[len(self.path):]
                         exists = self.trunk.get(h, False)
+                        print size
                         if exists:
-                            print 'hash: %s in trunk' % h
+                            print 'hash: %s in trunk, size: %d' % (h, size)
                             try:
                                 files = json.loads(exists)
                             except Exception:
                                 files = [exists]
 
                             files.append(filename)
-                            self.trunk[h] = json.dumps(files)
+                            self.trunk[h] = (json.dumps(files), size)
                         else:
-                            self.trunk[h] = filename
+                            self.trunk[h] = (filename, size)
 
     def save(self):
         c = self.connection.cursor()
         c.executemany(
-            'INSERT INTO trunk VALUES (?, ?, ?)',
-            [(k, v, self.version) for k, v in self.trunk.iteritems()])
+            'INSERT INTO trunk VALUES (?, ?, ?, ?)',
+            [(k, v[0], v[1], self.version) for k, v in self.trunk.iteritems()])
         return self.connection.commit()
 
 
