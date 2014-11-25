@@ -74,7 +74,7 @@ class Ftrunk(object):
                     except Exception as e:
                         print e
                     else:
-                        self.put(h, filename)
+                        self.put(h, filename[len(self.path):])
         c = self.connection.cursor()
         c.executemany('INSERT INTO trunk VALUES (?, ?)', self.lst)
         self.connection.commit()
