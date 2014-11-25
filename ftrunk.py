@@ -5,6 +5,8 @@ import os
 import sqlite3
 import time
 
+from datetime import datetime
+
 
 class Ftrunk(object):
 
@@ -22,16 +24,19 @@ class Ftrunk(object):
         query = """CREATE TABLE IF NOT EXISTS trunk (
             hash text,
             file text,
+            cdate text,
             PRIMARY KEY(hash)
         )"""
         c.execute(query)
         query = """CREATE TABLE IF NOT EXISTS config (
             key text,
             value text,
+            cdate text,
             PRIMARY KEY(key)
         )"""
         c.execute(query)
-        c.execute('INSERT INTO config VALUES(?, ?)', ('root', self.trunkname))
+        c.execute('INSERT OR REPLACE INTO config values(?, ?, ?)',
+                  ('root', self.trunkname, datetime.utcnow()))
         c.execute('SELECT EXISTS (SELECT 1 FROM trunk)')
         self.is_empty = False if c.fetchone()[0] else True
         self.connection.commit()
@@ -46,7 +51,7 @@ class Ftrunk(object):
         return value[1]
 
     def put(self, key, value):
-        self.lst.append((key, value))
+        self.lst.append((key, value, datetime.utcnow()))
 
     def sha256_for_file(self, path, block_size=4096):
         h = hashlib.sha256()
@@ -64,6 +69,7 @@ class Ftrunk(object):
                     operator.itemgetter(0),
                     self.lst):
                 print 'current_path in list'
+#            continue
             if current_path:
                 self.put(current_path, 'dir')
             for f in files:
@@ -76,7 +82,7 @@ class Ftrunk(object):
                     else:
                         self.put(h, filename[len(self.path):])
         c = self.connection.cursor()
-        c.executemany('INSERT INTO trunk VALUES (?, ?)', self.lst)
+        c.executemany('INSERT INTO trunk VALUES (?, ?, ?)', self.lst)
         self.connection.commit()
 
 
