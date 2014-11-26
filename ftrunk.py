@@ -39,6 +39,9 @@ class Ftrunk(object):
         #c.execute('SELECT EXISTS (SELECT 1 FROM trunk)')
         self.connection.commit()
         self.trunk = {}
+        ftrunk_dir = os.path.expanduser('~/.ftrunk')
+        if not os.path.exists(ftrunk_dir):
+            os.mkdir(ftrunk_dir, 0700)
 
     def get(self, key):
         c = self.connection.cursor()
@@ -57,6 +60,9 @@ class Ftrunk(object):
                 h.update(chunk)
         return (h.hexdigest(), s)
 
+    def backup(self, filename, filehash):
+        print filename, filehash
+
     def read_dir(self, path):
         for path, _, files in os.walk(path):
             current_path = os.path.join(path)[len(self.path):]
@@ -70,9 +76,7 @@ class Ftrunk(object):
                     except Exception as e:
                         print e
                     else:
-                        filename = filename[len(self.path):]
                         exists = self.trunk.get(h, False)
-                        print size
                         if exists:
                             print 'hash: %s in trunk, size: %d' % (h, size)
                             try:
@@ -80,10 +84,15 @@ class Ftrunk(object):
                             except Exception:
                                 files = [exists[0]]
 
-                            files.append(filename)
+                            files.append(filename[len(self.path):])
                             self.trunk[h] = (json.dumps(files), size)
+                            # continue to avoid duplicates
+                            continue
                         else:
-                            self.trunk[h] = (filename, size)
+                            self.trunk[h] = (filename[len(self.path):], size)
+
+                        # backup the file
+                        self.backup(filename, h)
 
     def save(self):
         c = self.connection.cursor()
