@@ -40,7 +40,7 @@ class Ftrunk(object):
         self.connection.commit()
         self.trunk = {}
         ftrunk_dir = os.path.expanduser('~/.ftrunk')
-        if not os.path.exists(ftrunk_dir):
+        if not os.path.isdir(ftrunk_dir):
             os.mkdir(ftrunk_dir, 0700)
 
     def get(self, key):
