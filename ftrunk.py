@@ -104,8 +104,9 @@ class Ftrunk(object):
                         else:
                             self.trunk[h] = (filename[len(self.path):], size)
 
-                        # backup the file
-                        self.backup(filename, h)
+                        # backup the file only if size > 0
+                        if size:
+                            self.backup(filename, h)
 
     def save(self):
         c = self.connection.cursor()
