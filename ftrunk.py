@@ -1,9 +1,11 @@
+import bz2
 import hashlib
 import json
 import os
-import shutil
 import sqlite3
 import time
+
+from shutil import copyfileobj
 
 
 class Ftrunk(object):
@@ -74,7 +76,9 @@ class Ftrunk(object):
         # if no file create the parent dir
         os.makedirs(backup_dir)
         print filename, filehash, backup_file_path
-        return shutil.copy(filename, backup_file_path)
+        with open(filename, 'rb') as file_input:
+            with bz2.BZ2File(backup_file_path, 'wb', compresslevel=9) as output:
+                copyfileobj(file_input, output)
 
     def read_dir(self, path):
         for path, _, files in os.walk(path):
