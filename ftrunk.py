@@ -75,7 +75,6 @@ class Ftrunk(object):
             return
         # if no file create the parent dir
         os.makedirs(backup_dir)
-        print filename, filehash, backup_file_path
         with open(filename, 'rb') as file_input:
             with bz2.BZ2File(backup_file_path, 'wb', compresslevel=9) as output:
                 copyfileobj(file_input, output)
