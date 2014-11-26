@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
 import time
 
@@ -39,9 +40,9 @@ class Ftrunk(object):
         #c.execute('SELECT EXISTS (SELECT 1 FROM trunk)')
         self.connection.commit()
         self.trunk = {}
-        ftrunk_dir = os.path.expanduser('~/.ftrunk')
-        if not os.path.isdir(ftrunk_dir):
-            os.mkdir(ftrunk_dir, 0700)
+        self.ftrunk_dir = os.path.expanduser('~/.ftrunk')
+        if not os.path.isdir(self.ftrunk_dir):
+            os.mkdir(self.ftrunk_dir, 0o700)
 
     def get(self, key):
         c = self.connection.cursor()
@@ -61,7 +62,19 @@ class Ftrunk(object):
         return (h.hexdigest(), s)
 
     def backup(self, filename, filehash):
-        print filename, filehash
+        backup_dir = os.path.join(
+            self.ftrunk_dir,
+            filehash[:2],
+            filehash[2:4],
+            filehash[4:6])
+        backup_file_path = os.path.join(backup_dir, filehash)
+        if os.path.exists(backup_file_path):
+            print 'Bye I already have the file'
+            return
+        # if no file create the parent dir
+        os.makedirs(backup_dir)
+        print filename, filehash, backup_file_path
+        return shutil.copy(filename, backup_file_path)
 
     def read_dir(self, path):
         for path, _, files in os.walk(path):
