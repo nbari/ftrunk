@@ -48,7 +48,7 @@ class Ftrunk(object):
             raise KeyError(key)
         return value[1]
 
-    def sha256_for_file(self, path, block_size=4096):
+    def sha256_and_size(self, path, block_size=4096):
         h = hashlib.sha256()
         s = 0
         with open(path, 'rb') as f:
@@ -66,7 +66,7 @@ class Ftrunk(object):
                 filename = os.path.join(path, f)
                 if os.path.isfile(filename):
                     try:
-                        h, size = self.sha256_for_file(filename)
+                        h, size = self.sha256_and_size(filename)
                     except Exception as e:
                         print e
                     else:
