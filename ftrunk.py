@@ -78,7 +78,7 @@ class Ftrunk(object):
                             try:
                                 files = json.loads(exists)
                             except Exception:
-                                files = [exists]
+                                files = [exists[0]]
 
                             files.append(filename)
                             self.trunk[h] = (json.dumps(files), size)
