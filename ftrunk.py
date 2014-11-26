@@ -3,8 +3,11 @@ import hashlib
 import json
 import os
 import sqlite3
+import tempfile
 import time
+import zipfile
 
+from crypt import Crypt
 from shutil import copyfileobj
 
 
@@ -75,9 +78,20 @@ class Ftrunk(object):
             return
         # if no file create the parent dir
         os.makedirs(backup_dir)
+
+        # tuple with file descriptor and tmp file
+        fd, tmp = tempfile.mkstemp(suffix='.tmp', dir=self.ftrunk_dir)
+
         with open(filename, 'rb') as file_input:
-            with bz2.BZ2File(backup_file_path, 'wb', compresslevel=9) as output:
+            with bz2.BZ2File(tmp, 'wb', compresslevel=9) as output:
                 copyfileobj(file_input, output)
+
+        x = Crypt('password')
+        with open(tmp, 'rb') as in_file, open(backup_file_path, 'wb') as out_file:
+            x.encrypt(in_file, out_file)
+
+        os.close(fd)
+        os.remove(tmp)
 
     def read_dir(self, path):
         for path, _, files in os.walk(path):
