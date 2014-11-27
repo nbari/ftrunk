@@ -1,23 +1,22 @@
 import bz2
 import hashlib
 import json
+import multiprocessing
 import os
 import sqlite3
 import tempfile
 import time
-import zipfile
 
+from argparse import ArgumentParser
 from crypt import Crypt
 from shutil import copyfileobj
 
 
 class Ftrunk(object):
 
-    def __init__(self, path):
-        self.path = os.path.abspath(os.path.expanduser(path))
-        if not os.path.isdir(self.path):
-            return
-        self.trunkname = os.path.basename(path)
+    def __init__(self, path, name=None):
+        self.path = path
+        self.trunkname = name if name else os.path.basename(path)
         self.version = int(time.time())
         self.connection = sqlite3.connect('%s.ftrunk' % self.trunkname)
         self.connection.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
@@ -134,8 +133,43 @@ class Ftrunk(object):
 
 
 if __name__ == '__main__':
-    time_start = time.time()
-    ftrunk = Ftrunk('root')
+    start_time = time.time()
+
+    parser = ArgumentParser(description="create or restore file trunks")
+    parser.add_argument(
+        'src',
+        help='directory containing files to be backed or *.frunk file to be \
+restored when using option -r')
+    parser.add_argument(
+        '-d', '--destination',
+        help='directory where the backup will be written or restored when \
+using option -r')
+    parser.add_argument(
+        '-r', '--restore', action='store_true',
+        help='restore backup')
+    parser.add_argument(
+        '-n', '--name', action='store',
+        help='name of the .ftrunk file')
+    parser.add_argument(
+        '-p', '--passphrase',
+        help='passphrase to be used for encrypting or decrypting when \
+restoring, if not set, a random one is created')
+
+    args = parser.parse_args()
+
+    # sanity src dir
+    src = os.path.abspath(os.path.expanduser(args.src))
+    if not os.path.isdir(src):
+        exit('%s - Source directory does not exists' % src)
+
+    if args.destination:
+        dst = os.path.abspath(os.path.expanduser(args.destination))
+        if not os.path.isdir(src):
+            exit('--- pending create dir ---')
+
+    name = args.name.split()[0] if args.name else None
+
+    ftrunk = Ftrunk(src, name)
     ftrunk.read_dir(ftrunk.path)
     ftrunk.save()
-    print time.time() - time_start
+    print time.time() - start_time
