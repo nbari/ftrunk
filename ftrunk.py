@@ -1,7 +1,6 @@
 import bz2
 import hashlib
 import json
-import multiprocessing
 import os
 import sqlite3
 import tempfile
@@ -9,8 +8,8 @@ import time
 
 from argparse import ArgumentParser
 from crypt import Crypt
+from multiprocessing import Pool
 from shutil import copyfileobj
-from multiprocessing.pool import ThreadPool
 
 
 class Ftrunk(object):
@@ -93,65 +92,46 @@ class Ftrunk(object):
 
 
 def sha256_and_size(path, block_size=4096):
-    h = hashlib.sha256()
-    s = 0
-    with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(block_size), b''):
-            s += len(chunk)
-            h.update(chunk)
-    return (h.hexdigest(), s)
-
-trunk_list = []
-
-
-def create(root_path, filename):
     try:
-        h, size = sha256_and_size(filename)
-    except Exception as e:
-        print e
-    else:
-        return (h, filename[len(root_path):], size)
-
-def create2(xargs):
-    root_path, filename = xargs
-    try:
-        h, size = sha256_and_size(filename)
-    except Exception as e:
-        print e
-    else:
-        return (h, filename[len(root_path):], size)
-
-def update_trunk(rs):
-    print rs
-    trunk_list.append(rs)
+        with open(path, 'rb') as f:
+            h = hashlib.sha256()
+            s = 0
+            for chunk in iter(lambda: f.read(block_size), b''):
+                s += len(chunk)
+                h.update(chunk)
+        return h.hexdigest(), s
+    except Exception:
+        return None
 
 
 def backup(src_dir, trunk_name, passphrase):
     print src_dir, trunk_name, passphrase
 
-    pool = multiprocessing.Pool()
-#    pool = ThreadPool()
+    directories = []
+    files = []
 
-    for path, _, files in os.walk(src_dir):
-        current_path = os.path.join(path)[len(src_dir):]
-        if current_path:
-            trunk_list.append((current_path, None, 0))
-        for f in files:
-            filename = os.path.join(path, f)
-            if os.path.isfile(filename):
-                #pool.apply_async(
-                #    create,
-                #    args=(src_dir, filename),
-                #    callback=update_trunk)
-                args = (src_dir, filename)
-                print args
-                pool.map_async(create2, args)
+    def append_files(x):
+        if x:
+            files.append(x)
+
+    pool = Pool()
+
+    for root, dirs_o, files_o in os.walk(src_dir):
+        for d in dirs_o:
+            directories.append(os.path.join(root, d))
+        for f in files_o:
+            file_path = os.path.join(root, f)
+            if os.path.isfile(file_path):
+                pool.apply_async(
+                    sha256_and_size,
+                    args=(file_path),
+                    callback=append_files)
 
     pool.close()
     pool.join()
 
-    for x in trunk_list:
-        print x
+    print files
+
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
 

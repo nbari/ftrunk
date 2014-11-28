@@ -7,11 +7,13 @@ import time
 
 from hurry.filesize import size
 from multiprocessing import Pool
+from multiprocessing.pool import ThreadPool
 
 
 def list_files(path):
     directories = []
     files = []
+
     src = os.path.abspath(os.path.expanduser(path))
     for root, dirs_o, files_o in os.walk(src):
         for name in dirs_o:
@@ -20,30 +22,32 @@ def list_files(path):
             file_path = os.path.join(root, name)
             if os.path.isfile(file_path):
                 files.append(file_path)
+
     return directories, files
 
-def sha256_for_file(path, block_size=4096):
-    h = hashlib.sha256()
-    with open(path, 'rb') as rf:
-        for chunk in iter(lambda: rf.read(block_size), b''):
-            h.update(chunk)
-    return h.hexdigest(), path
 
-def log(x):
-    print x, len(x)
+def sha256_for_file(path, block_size=4096):
+    try:
+        with open(path, 'rb') as rf:
+            h = hashlib.sha256()
+            for chunk in iter(lambda: rf.read(block_size), b''):
+                h.update(chunk)
+        return h.hexdigest(), path
+    except IOError:
+        return None, path
 
 if __name__ == '__main__':
     start_time = time.time()
 
-    d, f = list_files('../root')
+    #d, f = list_files('../root')
+    d, f = list_files('~')
 
-    print d
+    print len(f), sys.getsizeof(f), size(sys.getsizeof(f))
+    print len(d), sys.getsizeof(d), size(sys.getsizeof(d))
 
-#    d, f = list_files('~')
-    #print len(f), sys.getsizeof(f), size(sys.getsizeof(f))
-    #print len(d), sys.getsizeof(d), size(sys.getsizeof(d))
+#    pool = ThreadPool()
+    pool = Pool()
+    hashes = pool.map(sha256_for_file, f)
+    print len(hashes)
 
-
-#    for i in d:
-#        print i
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
