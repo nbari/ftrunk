@@ -99,13 +99,13 @@ def sha256_and_size(path, block_size=4096):
             for chunk in iter(lambda: f.read(block_size), b''):
                 s += len(chunk)
                 h.update(chunk)
-        return h.hexdigest(), s
+        return h.hexdigest(), path, s
     except Exception:
         return None
 
 
-def backup(src_dir, trunk_name, passphrase):
-    print src_dir, trunk_name, passphrase
+def backup(src_dir, trunk_name):
+    print src_dir, trunk_name
 
     directories = []
     files = []
@@ -124,14 +124,15 @@ def backup(src_dir, trunk_name, passphrase):
             if os.path.isfile(file_path):
                 pool.apply_async(
                     sha256_and_size,
-                    args=(file_path),
+                    args=(file_path,),
                     callback=append_files)
 
     pool.close()
     pool.join()
 
-    print files
-
+    print directories
+    for x in files:
+        print x
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
 
@@ -175,10 +176,4 @@ restoring, if not set, a random one is created')
         pass
     else:
         name = args.name.split()[0] if args.name else None
-        backup(src, name, args.passphrase)
-
-
-#    ftrunk = Ftrunk(src, name)
-#    ftrunk.read_dir(ftrunk.path)
-#    ftrunk.save()
-#    print time.time() - start_time
+        backup(src, name)
