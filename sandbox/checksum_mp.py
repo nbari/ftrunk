@@ -13,8 +13,10 @@ def adler32sum(filename="big.txt", block_size=2 ** 16):
     checksum = 0
     with open(filename, 'rb') as f:
         for chunk in iter(lambda: f.read(block_size), b''):
+            print len(chunk)
             checksum = zlib.adler32(chunk, checksum)
             # Oxffffffff forces checksum to be in range 0 to 2**32-1
+            print checksum,
     return str(checksum & 0xffffffff)
 
 def crc32sum(filename="big.txt", block_size=2 ** 16):
@@ -37,7 +39,7 @@ def sha256sum(filename="big.txt", block_size=2 ** 16):
 
 # main()
 #print sha256sum('/tmp/10gfile')
-print adler32sum('/tmp/10gfile')
-#print crc32sum('/tmp/10gfile')
+#print adler32sum('/tmp/10gfile')
+print crc32sum('col2.txt')
 
 print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
