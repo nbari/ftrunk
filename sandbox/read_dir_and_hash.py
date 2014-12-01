@@ -30,4 +30,4 @@ def sha256_for_file(path, block_size=4096):
     return h.hexdigest()
 
 if __name__ == '__main__':
-    list_files('root')
+    list_files('../root')

@@ -50,14 +50,12 @@ def main():
     print "sha256 is", sha256.hexdigest()
 
 def sha256_for_file(path, block_size=4096):
+
     try:
         with open(path, 'rb') as rf:
             h = hashlib.sha256()
-            pool = multiprocessing.Pool()
             for chunk in iter(lambda: rf.read(block_size), b''):
-                #h.update(chunk)
-                results = pool.map_async(h.update, chunk)
-        print results
+                h.update(chunk)
         #return h.hexdigest(), path
         return h.hexdigest(), path
     except IOError:
@@ -67,6 +65,6 @@ def sha256_for_file(path, block_size=4096):
 start_time = time.time()
 
 #main()
-print sha256_for_file('/tmp/test1g')
+print sha256_for_file('/tmp/10gfile')
 
 print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
