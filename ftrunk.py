@@ -92,10 +92,10 @@ class Ftrunk(object):
         return self.connection.commit()
 
 
-def sha256_and_size(path, block_size=4096):
+def checksum(path, block_size=4096):
     try:
         with open(path, 'rb') as f:
-            h = hashlib.sha256()
+            h = hashlib.sha512()
             s = 0
             for chunk in iter(lambda: f.read(block_size), b''):
                 s += len(chunk)
@@ -109,11 +109,15 @@ def backup(src_dir, trunk_name):
     print src_dir, trunk_name
 
     directories = []
-    files = []
+    files = {}
 
     def append_files(x):
         if x:
-            files.append(x)
+            f = files.setdefault(x[0], [])
+            if f:
+                f[0][0].append(x[1])
+            else:
+                f.append(([x[1]], x[2]))
 
     pool = Pool()
 
@@ -124,7 +128,7 @@ def backup(src_dir, trunk_name):
             file_path = os.path.join(root, f)
             if os.path.isfile(file_path):
                 pool.apply_async(
-                    sha256_and_size,
+                    checksum,
                     args=(file_path,),
                     callback=append_files)
 
@@ -133,7 +137,7 @@ def backup(src_dir, trunk_name):
 
     print directories
     for x in files:
-        print x
+        print x, files[x]
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
 
