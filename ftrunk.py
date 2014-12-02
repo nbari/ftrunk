@@ -72,16 +72,17 @@ class Ftrunk(object):
         # tuple with file descriptor and tmp file
         fd, tmp = tempfile.mkstemp(suffix='.tmp', dir=self.ftrunk_dir)
 
-        with open(filename, 'rb') as file_input:
-            with bz2.BZ2File(tmp, 'wb', compresslevel=9) as output:
-                copyfileobj(file_input, output)
+        try:
+            with open(filename, 'rb') as file_input:
+                with bz2.BZ2File(tmp, 'wb', compresslevel=9) as output:
+                    copyfileobj(file_input, output)
 
-        x = Crypt('password')
-        with open(tmp, 'rb') as in_file, open(backup_file_path, 'wb') as out_file:
-            x.encrypt(in_file, out_file)
-
-        os.close(fd)
-        os.remove(tmp)
+            x = Crypt('password')
+            with open(tmp, 'rb') as in_file, open(backup_file_path, 'wb') as out_file:
+                x.encrypt(in_file, out_file)
+        finally:
+            os.close(fd)
+            os.remove(tmp)
 
     def save(self):
         c = self.connection.cursor()
