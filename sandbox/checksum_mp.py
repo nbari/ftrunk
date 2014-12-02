@@ -1,6 +1,7 @@
-import multiprocessing
 import hashlib
+import multiprocessing
 import time
+import xxhash
 import zlib
 
 from multiprocessing import Pool
@@ -35,11 +36,19 @@ def sha256sum(filename="big.txt", block_size=2 ** 16):
             sha.update(chunk)
     return sha.hexdigest()
 
+def xxhash64(filename="big.txt", block_size=2 ** 16):
+    h = xxhash.xxh64()
+    with open(filename, 'rb') as f:
+        for chunk in iter(lambda: f.read(block_size), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
 
 
 # main()
 #print sha256sum('/tmp/10gfile')
+print xxhash64('/tmp/10gfile')
 #print adler32sum('/tmp/10gfile')
-print crc32sum('col2.txt')
+#print crc32sum('col2.txt')
 
 print '\n' + 'Elapsed time: ' + str(time.time() - start_time)

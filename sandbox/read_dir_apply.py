@@ -47,8 +47,8 @@ def sha256_for_file(path, block_size=4096):
 if __name__ == '__main__':
     start_time = time.time()
 
-    #d, f = list_files('../root')
-    d, f = list_files('~')
+    d, f = list_files('../root')
+    #d, f = list_files('~')
     print len(f)
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
