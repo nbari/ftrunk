@@ -3,6 +3,7 @@
 import hashlib
 import os
 import time
+import xxhash
 
 from multiprocessing import Pool
 
@@ -24,7 +25,8 @@ def list_files(path):
             file_path = os.path.join(root, name)
             if os.path.isfile(file_path):
                 pool.apply_async(
-                    sha256_for_file,
+                    #sha256_for_file,
+                    xxhash64,
                     args=(file_path,),
                     callback=append_files)
 
@@ -44,11 +46,22 @@ def sha256_for_file(path, block_size=4096):
     except IOError:
         return None, path
 
+
+def xxhash64(path, block_size=4096):
+    try:
+        with open(path, 'rb') as rf:
+            h = xxhash.xxh64()
+            for chunk in iter(lambda: rf.read(block_size), b''):
+                h.update(chunk)
+        return h.hexdigest(), path
+    except IOError:
+        return None, path
+
 if __name__ == '__main__':
     start_time = time.time()
 
-    d, f = list_files('../root')
-    #d, f = list_files('~')
+    #d, f = list_files('../root')
+    d, f = list_files('~')
     print len(f)
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
