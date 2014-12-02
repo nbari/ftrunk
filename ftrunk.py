@@ -137,7 +137,7 @@ def backup(src_dir, trunk_name):
 
     print directories
     for x in files:
-        print x, files[x]
+        print x, files[x][0][0], files[x][0][1]
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
 
