@@ -123,7 +123,7 @@ def backup(src_dir, trunk_name):
 
     for root, dirs_o, files_o in os.walk(src_dir):
         for d in dirs_o:
-            directories.append(os.path.join(root, d))
+            directories.append((os.path.join(root, d), None, 0))
         for f in files_o:
             file_path = os.path.join(root, f)
             if os.path.isfile(file_path):
@@ -135,9 +135,8 @@ def backup(src_dir, trunk_name):
     pool.close()
     pool.join()
 
-    print directories
-    for x in files:
-        print x, files[x][0][0], files[x][0][1]
+    files = [(k, json.dumps(v[0][0]), v[0][1]) for k, v in files.iteritems()]
+    print directories, files
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
 
