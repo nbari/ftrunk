@@ -48,13 +48,38 @@ class Ftrunk(object):
         if not os.path.isdir(self.ftrunk_dir):
             os.mkdir(self.ftrunk_dir, 0o700)
 
-    def get(self, key):
-        c = self.connection.cursor()
-        c.execute("select * from files where key = ?", (key, ))
-        value = c.fetchone()
-        if not value:
-            raise KeyError(key)
-        return value[1]
+    def read_dir(self):
+        directories = []
+        files = {}
+
+        def append_files(x):
+            if x:
+                f = files.setdefault(x[0], [])
+                if f:
+                    f[0][0].append(x[1])
+                else:
+                    f.append(([x[1]], x[2]))
+
+        pool = Pool()
+
+        for root, dirs_o, files_o in os.walk(self.path):
+            for d in dirs_o:
+                directories.append((os.path.join(root, d), None, 0))
+            for f in files_o:
+                file_path = os.path.join(root, f)
+                if os.path.isfile(file_path):
+                    pool.apply_async(
+                        checksum,
+                        args=(file_path,),
+                        callback=append_files)
+
+        pool.close()
+        pool.join()
+
+        files = [(k, json.dumps(v[0][0]), v[0][1]) for k, v in files.iteritems()]
+        print directories, files
+
+        print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
 
     def backup(self, filename, filehash):
         backup_dir = os.path.join(
@@ -180,4 +205,6 @@ restoring, if not set, a random one is created')
         pass
     else:
         name = args.name.split()[0] if args.name else None
-        backup(src, name)
+
+    ft = Ftrunk(src, name)
+    ft.read_dir()
