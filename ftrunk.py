@@ -2,7 +2,9 @@ import bz2
 import hashlib
 import json
 import os
+import random
 import sqlite3
+import string
 import tempfile
 import time
 
@@ -10,6 +12,12 @@ from argparse import ArgumentParser
 from crypt import Crypt
 from multiprocessing import Pool
 from shutil import copyfileobj
+
+
+def gen_password(length=64):
+    chars = string.ascii_letters + string.digits + string.punctuation
+    random.seed = (os.urandom(1024))
+    return ''.join(random.choice(chars) for i in xrange(length))
 
 
 def checksum512(path, block_size=4096):
@@ -97,11 +105,8 @@ class Ftrunk(object):
         pool.close()
         pool.join()
 
-        self.trunk['files'] = [(k, json.dumps(v[0][0]), v[0][1])
-                               for k, v in self.trunk['files'].iteritems()]
-
-        print self.trunk['dirs']
-        print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
+#        self.trunk['files'] = [(k, json.dumps(v[0][0]), v[0][1])
+#                               for k, v in self.trunk['files'].iteritems()]
 
     def backup(self, filename, filehash):
         backup_dir = os.path.join(
@@ -109,10 +114,13 @@ class Ftrunk(object):
             filehash[:2],
             filehash[2:4],
             filehash[4:6])
+
         backup_file_path = os.path.join(backup_dir, filehash)
+
         if os.path.exists(backup_file_path):
             print 'Bye I already have the file'
             return
+
         # if no file create the parent dir
         os.makedirs(backup_dir)
 
@@ -120,16 +128,19 @@ class Ftrunk(object):
         fd, tmp = tempfile.mkstemp(suffix='.tmp', dir=self.ftrunk_dir)
 
         try:
-            with open(filename, 'rb') as file_input:
-                with bz2.BZ2File(tmp, 'wb', compresslevel=9) as output:
-                    copyfileobj(file_input, output)
+            with open(filename, 'rb') as i:
+                with bz2.BZ2File(tmp, 'wb', compresslevel=9) as o:
+                    copyfileobj(i, o)
 
-            x = Crypt('password')
-            with open(tmp, 'rb') as in_file, open(backup_file_path, 'wb') as out_file:
-                x.encrypt(in_file, out_file)
+            x = Crypt(gen_password())
+            with open(tmp, 'rb') as i, open(backup_file_path, 'wb') as o:
+                x.encrypt(i, o)
         finally:
             os.close(fd)
             os.remove(tmp)
+
+        print x
+
 
     def save(self):
         c = self.connection.cursor()
@@ -137,48 +148,6 @@ class Ftrunk(object):
             'INSERT INTO trunk VALUES (?, ?, ?, ?)',
             [(k, v[0], v[1], self.version) for k, v in self.trunk.iteritems()])
         return self.connection.commit()
-
-
-def foo(xx):
-    print xx
-
-
-def backup(src_dir, trunk_name):
-    print src_dir, trunk_name
-
-    directories = []
-    files = {}
-
-    def append_files(x):
-        if x:
-            f = files.setdefault(x[0], [])
-            if f:
-                f[0][0].append(x[1])
-            else:
-                f.append(([x[1]], x[2]))
-
-    pool = Pool()
-
-    for root, dirs_o, files_o in os.walk(src_dir):
-        for d in dirs_o:
-            directories.append((os.path.join(root, d), None, 0))
-        for f in files_o:
-            file_path = os.path.join(root, f)
-            if os.path.isfile(file_path):
-                print file_path
-                exit()
-                pool.apply_async(
-                    foo,
-                    args=(file_path,),
-                    callback=append_files)
-
-    pool.close()
-    pool.join()
-
-    files = [(k, json.dumps(v[0][0]), v[0][1]) for k, v in files.iteritems()]
-    print directories, files
-
-    print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
 
 
 if __name__ == '__main__':
@@ -223,4 +192,9 @@ restoring, if not set, a random one is created')
 
     ft = Ftrunk(src, name)
     ft.build()
-    print ft.version
+
+    for file_k, file_v in ft.trunk['files'].iteritems():
+        print file_k, file_v[0][0][0], file_v[0][1]
+        exit()
+
+    print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
