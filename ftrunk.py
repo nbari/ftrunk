@@ -9,7 +9,6 @@ from argparse import ArgumentParser
 from base64 import b64encode, b64decode
 from crypt import Crypt
 from multiprocessing import Pool
-from shutil import copyfileobj
 from tempfile import SpooledTemporaryFile
 
 
@@ -133,10 +132,8 @@ class Ftrunk(object):
                         x.encrypt(tmp_file, out_file)
 
                     print b64encode(x.password)
-        finally:
-            #            os.close(fd)
-            #               os.remove(tmp)
-            print 'finished...'
+        except Exception:
+            return
 
     def save(self):
         c = self.connection.cursor()
