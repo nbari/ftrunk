@@ -2,22 +2,15 @@ import bz2
 import hashlib
 import json
 import os
-import random
 import sqlite3
-import string
 import tempfile
 import time
 
 from argparse import ArgumentParser
+from base64 import b64encode, b64decode
 from crypt import Crypt
 from multiprocessing import Pool
 from shutil import copyfileobj
-
-
-def gen_password(length=64):
-    chars = string.ascii_letters + string.digits + string.punctuation
-    random.seed = (os.urandom(1024))
-    return ''.join(random.choice(chars) for i in xrange(length))
 
 
 def checksum512(path, block_size=4096):
@@ -134,15 +127,13 @@ class Ftrunk(object):
                 with bz2.BZ2File(tmp, 'wb', compresslevel=9) as o:
                     copyfileobj(i, o)
 
-            x = Crypt(gen_password())
+            x = Crypt(os.urandom(32))
             with open(tmp, 'rb') as i, open(backup_file_path, 'wb') as o:
                 x.encrypt(i, o)
+            print b64encode(x.password)
         finally:
             os.close(fd)
             os.remove(tmp)
-
-        print x.password
-
 
     def save(self):
         c = self.connection.cursor()
@@ -196,7 +187,7 @@ restoring, if not set, a random one is created')
     ft.build()
 
     for file_k, file_v in ft.trunk['files'].iteritems():
-#        print file_k, file_v[0][0][0], file_v[0][1]
+        #        print file_k, file_v[0][0][0], file_v[0][1]
         ft.backup(file_v[0][0][0], file_k)
         exit()
 
