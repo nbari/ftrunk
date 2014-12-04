@@ -117,6 +117,8 @@ class Ftrunk(object):
 
         backup_file_path = os.path.join(backup_dir, filehash)
 
+        print backup_dir, backup_file_path
+
         if os.path.exists(backup_file_path):
             print 'Bye I already have the file'
             return
@@ -139,7 +141,7 @@ class Ftrunk(object):
             os.close(fd)
             os.remove(tmp)
 
-        print x
+        print x.password
 
 
     def save(self):
@@ -194,7 +196,8 @@ restoring, if not set, a random one is created')
     ft.build()
 
     for file_k, file_v in ft.trunk['files'].iteritems():
-        print file_k, file_v[0][0][0], file_v[0][1]
+#        print file_k, file_v[0][0][0], file_v[0][1]
+        ft.backup(file_v[0][0][0], file_k)
         exit()
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
