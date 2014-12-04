@@ -17,6 +17,7 @@ class Crypt(object):
 
 
     def encrypt(self, in_file, out_file):
+        in_file.seek(0)
         bs = AES.block_size
         salt = Random.new().read(bs - len('Salted__'))
         key, iv = self.derive_key_and_iv(self.password, salt, 32, bs)
@@ -33,6 +34,7 @@ class Crypt(object):
 
 
     def decrypt(self, in_file, out_file):
+        in_file.seek(0)
         bs = AES.block_size
         salt = in_file.read(bs)[len('Salted__'):]
         key, iv = self.derive_key_and_iv(self.password, salt, 32, bs)

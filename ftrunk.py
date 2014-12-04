@@ -3,7 +3,6 @@ import hashlib
 import json
 import os
 import sqlite3
-import tempfile
 import time
 
 from argparse import ArgumentParser
@@ -11,6 +10,7 @@ from base64 import b64encode, b64decode
 from crypt import Crypt
 from multiprocessing import Pool
 from shutil import copyfileobj
+from tempfile import SpooledTemporaryFile
 
 
 def checksum512(path, block_size=4096):
@@ -119,21 +119,24 @@ class Ftrunk(object):
         # if no file create the parent dir
         os.makedirs(backup_dir)
 
-        # tuple with file descriptor and tmp file
-        fd, tmp = tempfile.mkstemp(suffix='.tmp', dir=self.ftrunk_dir)
-
         try:
-            with open(filename, 'rb') as i:
-                with bz2.BZ2File(tmp, 'wb', compresslevel=9) as o:
-                    copyfileobj(i, o)
+            with open(filename, 'rb') as in_file:
+                with SpooledTemporaryFile(suffix='.tmp', dir=self.ftrunk_dir) \
+                        as tmp_file:
+                    compressor = bz2.BZ2Compressor(9)
+                    for chunk in iter(lambda: in_file.read(4096), b''):
+                        tmp_file.write(compressor.compress(chunk))
+                    tmp_file.write(compressor.flush())
 
-            x = Crypt(os.urandom(32))
-            with open(tmp, 'rb') as i, open(backup_file_path, 'wb') as o:
-                x.encrypt(i, o)
-            print b64encode(x.password)
+                    x = Crypt(os.urandom(32))
+                    with open(backup_file_path, 'wb') as out_file:
+                        x.encrypt(tmp_file, out_file)
+
+                    print b64encode(x.password)
         finally:
-            os.close(fd)
-            os.remove(tmp)
+            #            os.close(fd)
+            #               os.remove(tmp)
+            print 'finished...'
 
     def save(self):
         c = self.connection.cursor()
