@@ -137,6 +137,7 @@ class Ftrunk(object):
             return
 
     def encrypt(self, in_file, out_file):
+        # out_file: iv + AES encrypted file
         aes_key = os.urandom(32)
         iv = ''.join(chr(random.randint(0, 0xFF)) for i in range(16))
         chiper = AES.new(aes_key, AES.MODE_CBC, iv)
@@ -144,11 +145,24 @@ class Ftrunk(object):
         out_file.write(iv)
         in_file.seek(0)
         for chunk in iter(lambda: in_file.read(1024 * bs), b''):
-            if len(chunk) % 16 != 0:
+            if len(chunk) % bs != 0:
                 padding_length = (bs - len(chunk) % bs) or bs
                 chunk += padding_length * chr(padding_length)
             out_file.write(chiper.encrypt(chunk))
         return b64encode(aes_key)
+
+    def decrypt(self, key, in_filename, out_filename):
+        with open(in_filename) as in_file:
+            aes_key = b64decode(key)
+            bs = AES.block_size
+            iv = in_file.read(bs)
+            cipher = AES.new(aes_key, AES.MODE_CBC, iv)
+            with open(out_filename, 'wb') as out_file:
+                for chunk in iter(lambda: in_file.read(1024 * bs), b''):
+                    chunk = cipher.decrypt(chunk)
+                    if len(chunk) % bs != 0:
+                        out_file.write(chunk.rstrip(chunk[-1]))
+                    out_file.write(chunk)
 
     def save(self):
         c = self.connection.cursor()
