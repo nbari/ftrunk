@@ -4,10 +4,11 @@ import json
 import os
 import sqlite3
 import time
+import random
 
+from Crypto.Cipher import AES
 from argparse import ArgumentParser
 from base64 import b64encode, b64decode
-from crypt import Crypt
 from multiprocessing import Pool
 from tempfile import SpooledTemporaryFile
 
@@ -127,13 +128,27 @@ class Ftrunk(object):
                         tmp_file.write(compressor.compress(chunk))
                     tmp_file.write(compressor.flush())
 
-                    x = Crypt(os.urandom(32))
                     with open(backup_file_path, 'wb') as out_file:
-                        x.encrypt(tmp_file, out_file)
-
-                    print b64encode(x.password)
+                        try:
+                            return self.encrypt(tmp_file, out_file)
+                        except Exception as e:
+                            print e
         except Exception:
             return
+
+    def encrypt(self, in_file, out_file):
+        aes_key = os.urandom(32)
+        iv = ''.join(chr(random.randint(0, 0xFF)) for i in range(16))
+        chiper = AES.new(aes_key, AES.MODE_CBC, iv)
+        bs = AES.block_size
+        out_file.write(iv)
+        in_file.seek(0)
+        for chunk in iter(lambda: in_file.read(1024 * bs), b''):
+            if len(chunk) % 16 != 0:
+                padding_length = (bs - len(chunk) % bs) or bs
+                chunk += padding_length * chr(padding_length)
+            out_file.write(chiper.encrypt(chunk))
+        return b64encode(aes_key)
 
     def save(self):
         c = self.connection.cursor()
@@ -179,6 +194,7 @@ restoring, if not set, a random one is created')
             exit('--- pending create dir ---')
 
     if args.restore:
+
         pass
     else:
         name = args.name.split()[0] if args.name else None
@@ -188,7 +204,8 @@ restoring, if not set, a random one is created')
 
     for file_k, file_v in ft.trunk['files'].iteritems():
         #        print file_k, file_v[0][0][0], file_v[0][1]
-        ft.backup(file_v[0][0][0], file_k)
+        x = ft.backup(file_v[0][0][0], file_k)
+        print x
         exit()
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)

@@ -1,4 +1,5 @@
-from hashlib import md5
+import random
+
 from Crypto import Random
 from Crypto.Cipher import AES
 
@@ -8,19 +9,12 @@ class Crypt(object):
     def __init__(self, password):
         self.password = password
 
-    def derive_key_and_iv(self, password, salt, key_length, iv_length):
-        d = d_i = ''
-        while len(d) < key_length + iv_length:
-            d_i = md5(d_i + password + salt).digest()
-            d += d_i
-        return d[:key_length], d[key_length:key_length + iv_length]
-
-
     def encrypt(self, in_file, out_file):
         in_file.seek(0)
         bs = AES.block_size
         salt = Random.new().read(bs - len('Salted__'))
         key, iv = self.derive_key_and_iv(self.password, salt, 32, bs)
+        iv = ''.join(chr(random.randint(0, 0xFF)) for i in range(16))
         cipher = AES.new(key, AES.MODE_CBC, iv)
         out_file.write('Salted__' + salt)
         finished = False
