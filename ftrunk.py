@@ -41,6 +41,7 @@ class Ftrunk(object):
             hash text,
             file text,
             size integer,
+            pass text,
             version integer,
             UNIQUE(hash, version) ON CONFLICT REPLACE
         )"""
@@ -130,8 +131,9 @@ class Ftrunk(object):
                             return self.encrypt(tmp_file, out_file)
                         except Exception as e:
                             print e
-        except Exception:
-            return
+        except Exception as e:
+            print e
+            return None
 
     def encrypt(self, in_file, out_file):
         # out_file: iv + AES encrypted file
@@ -161,11 +163,9 @@ class Ftrunk(object):
                         out_file.write(chunk.rstrip(chunk[-1]))
                     out_file.write(chunk)
 
-    def save(self):
+    def save(self, data):
         c = self.connection.cursor()
-        c.executemany(
-            'INSERT INTO trunk VALUES (?, ?, ?, ?)',
-            [(k, v[0], v[1], self.version) for k, v in self.trunk.iteritems()])
+        c.executemany('INSERT INTO trunk VALUES (?, ?, ?, ?, ?)', data)
         return self.connection.commit()
 
 
@@ -216,7 +216,16 @@ restoring, if not set, a random one is created')
     for file_k, file_v in ft.trunk['files'].iteritems():
         #        print file_k, file_v[0][0][0], file_v[0][1]
         x = ft.backup(file_v[0][0][0], file_k)
-        print x
+        if x:
+            ft.save(
+                [(
+                    file_k,
+                    file_v[0][0][0][len(ft.path):],
+                    file_v[0][1],
+                    x,
+                    ft.version
+                )])
+        print 'file_k: %s\nfile_v: %s \nnaked_file: %s\npass: %s\nversion: %s' % (file_k, file_v, file_v[0][0][0][len(ft.path):], x, ft.version)
         exit()
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
