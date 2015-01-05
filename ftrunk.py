@@ -35,9 +35,7 @@ class Ftrunk(object):
         self.connection = sqlite3.connect('%s.ftrunk' % self.trunkname)
         self.connection.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
         c = self.connection.cursor()
-        c.execute('PRAGMA synchronous=OFF')
         c.execute('PRAGMA temp_store=MEMORY')
-        c.execute('PRAGMA journal_mode=MEMORY')
 
         # trunk table for storing files/directories
         query = """CREATE TABLE IF NOT EXISTS trunk (
