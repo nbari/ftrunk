@@ -32,33 +32,34 @@ class Ftrunk(object):
         self.path = path
         self.trunkname = tname if tname else os.path.basename(path)
         self.version = int(time.time())
-        self.connection = sqlite3.connect('%s.ftrunk' % self.trunkname)
-        self.connection.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
-        c = self.connection.cursor()
+        self.db = sqlite3.connect('%s.ftrunk' % self.trunkname)
+        self.db.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
+        c = self.db.cursor()
 
         # trunk table for storing files/directories
         query = """CREATE TABLE IF NOT EXISTS trunk (
-            hash text,
-            file text,
-            size integer,
-            pass text,
-            version integer,
+            hash TEXT,
+            file TEXT,
+            size INTEGER,
+            pass TEXT,
+            status INTEGER DEFAULT 0,
+            version INTEGER,
             UNIQUE(hash, version) ON CONFLICT REPLACE
         )"""
         c.execute(query)
 
         # config table
         query = """CREATE TABLE IF NOT EXISTS config (
-            key text,
-            value text,
-            version integer,
+            key TEXT,
+            value TEXT,
+            version INTEGER,
             PRIMARY KEY(key)
         )"""
         c.execute(query)
         c.execute('INSERT OR REPLACE INTO config values(?, ?, ?)',
                   ('root', self.trunkname, self.version))
         #c.execute('SELECT EXISTS (SELECT 1 FROM trunk)')
-        self.connection.commit()
+        self.db.commit()
 
         self.trunk = {}
 
@@ -97,10 +98,22 @@ class Ftrunk(object):
         pool.close()
         pool.join()
 
-#        self.trunk['files'] = [(k, json.dumps(v[0][0]), v[0][1])
-#                               for k, v in self.trunk['files'].iteritems()]
+        # trunk files structure
+        # hash, list of file or files, size
+        self.trunk['files'] = [(k, json.dumps(v[0][0]), v[0][1])
+                               for k, v in self.trunk['files'].iteritems()]
 
     def backup(self, filename, filehash):
+        """encrypt filename and save it on the backup dir
+        if success
+            return base64(password)
+        else:
+            return None
+        """
+        if not os.path.isfile(filename):
+            print 'Not a file'
+            return
+
         backup_dir = os.path.join(
             self.ftrunk_dir,
             filehash[:2],
@@ -109,14 +122,13 @@ class Ftrunk(object):
 
         backup_file_path = os.path.join(backup_dir, filehash)
 
-        print backup_dir, backup_file_path
-
-        if os.path.exists(backup_file_path):
+        if os.path.isfile(backup_file_path):
             print 'Bye I already have the file'
             return
 
-        # if no file create the parent dir
-        os.makedirs(backup_dir)
+        # create the backup_dir
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
 
         try:
             with open(filename, 'rb') as in_file:
@@ -134,7 +146,7 @@ class Ftrunk(object):
                             print e
         except Exception as e:
             print e
-            return None
+            return
 
     def encrypt(self, in_file, out_file):
         # out_file: iv + AES encrypted file
@@ -164,12 +176,21 @@ class Ftrunk(object):
                         out_file.write(chunk.rstrip(chunk[-1]))
                     out_file.write(chunk)
 
-    def save(self):
-        c = self.connection.cursor()
-        c.executemany(
-            'INSERT INTO trunk VALUES (?, ?, ?, ?)',
-            [(k, v[0], v[1], self.version) for k, v in self.trunk.iteritems()])
-        return self.connection.commit()
+    def save_trunk(self, data):
+        c = self.db.cursor()
+        query = """INSERT INTO trunk(
+            hash,
+            file,
+            size,
+            version
+        ) VALUES(?, ?, ?, %s)""" % (self.version)
+        c.executemany(query, data)
+        return self.db.commit()
+
+    def save_password(self, password, key_hash):
+        c = self.db.cursor()
+        c.execute('UPDATE trunk SET pass=? WHERE hash=?', (password, key_hash))
+        return self.db.commit()
 
 
 if __name__ == '__main__':
@@ -215,11 +236,19 @@ restoring, if not set, a random one is created')
 
     ft = Ftrunk(src, name)
     ft.build()
+    ft.save_trunk(ft.trunk['dirs'] + ft.trunk['files'])
 
-    print ft.trunk['files']
-    print ft.trunk['dirs']
-    # for file_k, file_v in ft.trunk['files'].iteritems():
-    #        print file_k, file_v[0][0][0], file_v[0][1]
+    for f in ft.trunk['files']:
+        f_hash, f_list, f_size = f
+        if f_size:
+            f_list = json.loads(f_list)
+            x = ft.backup(
+                os.path.join(ft.path, f_list[0].lstrip(os.sep)),
+                f_hash)
+            if x:
+                print x
+                ft.save_password(x, f_hash)
+
     #    x = ft.backup(file_v[0][0][0], file_k)
     #   print file_k, file_v
     #    print 'file_k: %s\nfile_v: %s \nnaked_file: %s\npass: %s\nversion: %s' % (file_k, file_v, file_v[0][0][0][len(ft.path):], x, ft.version)
