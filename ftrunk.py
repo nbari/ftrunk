@@ -74,16 +74,17 @@ class Ftrunk(object):
             if x:
                 f = self.trunk['files'].setdefault(x[0], [])
                 if f:
-                    f[0][0].append(x[1])
+                    f[0][0].append(x[1][len(self.path):])
                 else:
-                    f.append(([x[1]], x[2]))
+                    f.append(([x[1][len(self.path):]], x[2]))
 
         # multiprocessing Pool (use all the cores)
         pool = Pool()
 
         for root, dirs_o, files_o in os.walk(self.path):
             for d in dirs_o:
-                self.trunk['dirs'].append((os.path.join(root, d), None, 0))
+                self.trunk['dirs'].append(
+                    (os.path.join(root, d)[len(self.path):], None, 0))
             for f in files_o:
                 file_path = os.path.join(root, f)
                 if os.path.isfile(file_path):
@@ -163,9 +164,11 @@ class Ftrunk(object):
                         out_file.write(chunk.rstrip(chunk[-1]))
                     out_file.write(chunk)
 
-    def save(self, data):
+    def save(self):
         c = self.connection.cursor()
-        c.executemany('INSERT INTO trunk VALUES (?, ?, ?, ?, ?)', data)
+        c.executemany(
+            'INSERT INTO trunk VALUES (?, ?, ?, ?)',
+            [(k, v[0], v[1], self.version) for k, v in self.trunk.iteritems()])
         return self.connection.commit()
 
 
@@ -213,19 +216,13 @@ restoring, if not set, a random one is created')
     ft = Ftrunk(src, name)
     ft.build()
 
-    for file_k, file_v in ft.trunk['files'].iteritems():
-        #        print file_k, file_v[0][0][0], file_v[0][1]
-        x = ft.backup(file_v[0][0][0], file_k)
-        if x:
-            ft.save(
-                [(
-                    file_k,
-                    file_v[0][0][0][len(ft.path):],
-                    file_v[0][1],
-                    x,
-                    ft.version
-                )])
-        print 'file_k: %s\nfile_v: %s \nnaked_file: %s\npass: %s\nversion: %s' % (file_k, file_v, file_v[0][0][0][len(ft.path):], x, ft.version)
-        exit()
+    print ft.trunk['files']
+    print ft.trunk['dirs']
+    # for file_k, file_v in ft.trunk['files'].iteritems():
+    #        print file_k, file_v[0][0][0], file_v[0][1]
+    #    x = ft.backup(file_v[0][0][0], file_k)
+    #   print file_k, file_v
+    #    print 'file_k: %s\nfile_v: %s \nnaked_file: %s\npass: %s\nversion: %s' % (file_k, file_v, file_v[0][0][0][len(ft.path):], x, ft.version)
+    #    exit()
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
