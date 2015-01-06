@@ -28,20 +28,12 @@ def checksum512(path, block_size=4096):
 
 class Ftrunk(object):
 
-    def __init__(self, name, src, dst):
-        self.trunkname = name
-        self.src = src
-        self.dst = dst
+    def __init__(self, db_, src_, dst_):
+        self.db = db_
+        self.src = src_
+        self.dst = dst_
         self.version = int(time.time())
 
-        self.trunks = os.path.expanduser('~/.ftrunk')
-        if not os.path.isdir(self.trunks):
-            os.mkdir(self.trunks, 0o700)
-
-        db = os.path.join(self.trunks, '%s.ftrunk' % self.trunkname)
-        self.db = sqlite3.connect(db)
-
-        self.db.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
         c = self.db.cursor()
 
         # trunk table for storing files/directories
@@ -210,11 +202,11 @@ if __name__ == '__main__':
         'name',
         help='name of the file trunk')
     parser.add_argument(
-        'src',
+        '-s', action='store', dest='src',
         help='source directory containing files to be backed or *.frunk file \
 to be restored when using option -r')
     parser.add_argument(
-        'dst',
+        '-d', action='store', dest='dst',
         help='destination directory where the backup will be written \
 or restored when using option -r')
     parser.add_argument(
@@ -224,23 +216,55 @@ or restored when using option -r')
     args = parser.parse_args()
 
     name = args.name.split()[0]
+    trunks = os.path.expanduser('~/.ftrunk')
+    if not os.path.isdir(trunks):
+        os.mkdir(trunks, 0o700)
 
-    # sanity src dir
-    src = os.path.abspath(os.path.expanduser(args.src))
+    db = os.path.join(trunks, '%s.ftrunk' % name)
+    db = sqlite3.connect(db)
+    db.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
+
+    c = db.cursor()
+
+    # if ftrunk database exists, try to use it and just backup new files
+    # without need to specify src, dst
+    try:
+        c.execute('SELECT value FROM config where key="src"')
+        src = c.fetchone()[0]
+        c.execute('SELECT value FROM config where key="dst"')
+        dst = c.fetchone()[0]
+    except Exception:
+        src = dst = None
+
+    # set src using -s arg or use the existing one declared on the trunk db
+    if args.src:
+        args.src = os.path.abspath(os.path.expanduser(args.src))
+        if src and src != args.src:
+            exit('Trunk already exists')
+        src = args.src
+
+    # check that src dir exists
     if not os.path.isdir(src):
         exit('%s - Source directory does not exists' % src)
 
-    dst = os.path.abspath(os.path.expanduser(args.dst))
+    # set dst using -d arg or use the existing one declared on the trunk db
+    if args.dst:
+        args.dst = os.path.abspath(os.path.expanduser(args.dst))
+        if dst and dst != args.dst:
+            exit('Trunk already exists')
+        dst = args.dst
 
+    # check that dst dir exists
     if not os.path.isdir(dst):
         if not os.path.isdir(os.path.abspath(os.path.join(dst, os.pardir))):
             exit('%s - Destination directory does not exists' % dst)
         os.mkdir(dst, 0o700)
 
+
     if args.restore:
         exit('---- restore ---- pending')
 
-    ft = Ftrunk(name, src, dst)
+    ft = Ftrunk(db, src, dst)
     ft.build()
     ft.save_trunk(ft.trunk['dirs'] + ft.trunk['files'])
 
