@@ -2,9 +2,10 @@ import bz2
 import hashlib
 import json
 import os
-import sqlite3
-import time
 import random
+import sqlite3
+import sys
+import time
 
 from Crypto.Cipher import AES
 from argparse import ArgumentParser
@@ -130,7 +131,6 @@ class Ftrunk(object):
         backup_file_path = os.path.join(backup_dir, filehash)
 
         if os.path.isfile(backup_file_path):
-            print 'Bye I already have the file'
             return
 
         # create the backup_dir
@@ -277,7 +277,12 @@ or restored when using option -r')
     ft.build()
     ft.save_trunk(ft.trunk['dirs'] + ft.trunk['files'])
 
+    total_files = len(ft.trunk['files'])
     for f_ in ft.trunk['files']:
+        total_files -= 1
+        sys.stdout.write("\r%d%%" %
+                         (100 - (total_files * 100) / len(ft.trunk['files'])))
+        sys.stdout.flush()
         f_hash, f_list, f_size = f_
         if f_size:
             f_list = json.loads(f_list)
@@ -285,7 +290,6 @@ or restored when using option -r')
                 os.path.join(ft.src, f_list[0].lstrip(os.sep)),
                 f_hash)
             if psw:
-                print psw
                 ft.save_password(f_hash, psw)
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
