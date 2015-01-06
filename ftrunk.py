@@ -28,11 +28,19 @@ def checksum512(path, block_size=4096):
 
 class Ftrunk(object):
 
-    def __init__(self, path, tname=None):
-        self.path = path
-        self.trunkname = tname if tname else os.path.basename(path)
+    def __init__(self, name, src, dst):
+        self.trunkname = name
+        self.src = src
+        self.dst = dst
         self.version = int(time.time())
-        self.db = sqlite3.connect('%s.ftrunk' % self.trunkname)
+
+        self.trunks = os.path.expanduser('~/.ftrunk')
+        if not os.path.isdir(self.trunks):
+            os.mkdir(self.trunks, 0o700)
+
+        db = os.path.join(self.trunks, '%s.ftrunk' % self.trunkname)
+        self.db = sqlite3.connect(db)
+
         self.db.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
         c = self.db.cursor()
 
@@ -56,16 +64,17 @@ class Ftrunk(object):
             PRIMARY KEY(key)
         )"""
         c.execute(query)
-        c.execute('INSERT OR REPLACE INTO config values(?, ?, ?)',
-                  ('root', self.trunkname, self.version))
+
+        c.executemany('INSERT OR REPLACE INTO config VALUES(?, ?, ?)',
+                      [
+                          ('src', self.src, self.version),
+                          ('dst', self.dst, self.version)
+                      ])
+
         #c.execute('SELECT EXISTS (SELECT 1 FROM trunk)')
         self.db.commit()
 
         self.trunk = {}
-
-        self.ftrunk_dir = os.path.expanduser('~/.ftrunk')
-        if not os.path.isdir(self.ftrunk_dir):
-            os.mkdir(self.ftrunk_dir, 0o700)
 
     def build(self):
         self.trunk['dirs'] = []
@@ -75,17 +84,17 @@ class Ftrunk(object):
             if x:
                 f = self.trunk['files'].setdefault(x[0], [])
                 if f:
-                    f[0][0].append(x[1][len(self.path):])
+                    f[0][0].append(x[1][len(self.src):])
                 else:
-                    f.append(([x[1][len(self.path):]], x[2]))
+                    f.append(([x[1][len(self.src):]], x[2]))
 
         # multiprocessing Pool (use all the cores)
         pool = Pool()
 
-        for root, dirs_o, files_o in os.walk(self.path):
+        for root, dirs_o, files_o in os.walk(self.src):
             for d in dirs_o:
                 self.trunk['dirs'].append(
-                    (os.path.join(root, d)[len(self.path):], None, 0))
+                    (os.path.join(root, d)[len(self.src):], None, 0))
             for f in files_o:
                 file_path = os.path.join(root, f)
                 if os.path.isfile(file_path):
@@ -115,7 +124,7 @@ class Ftrunk(object):
             return
 
         backup_dir = os.path.join(
-            self.ftrunk_dir,
+            self.dst,
             filehash[:2],
             filehash[2:4],
             filehash[4:6])
@@ -132,7 +141,7 @@ class Ftrunk(object):
 
         try:
             with open(filename, 'rb') as in_file:
-                with SpooledTemporaryFile(suffix='.tmp', dir=self.ftrunk_dir) \
+                with SpooledTemporaryFile(suffix='.tmp', dir=self.dst) \
                         as tmp_file:
                     compressor = bz2.BZ2Compressor(9)
                     for chunk in iter(lambda: in_file.read(4096), b''):
@@ -228,31 +237,22 @@ or restored when using option -r')
             exit('%s - Destination directory does not exists' % dst)
         os.mkdir(dst, 0o700)
 
-
-    print name, src, dst
-    exit()
-
     if args.restore:
         exit('---- restore ---- pending')
 
-    ft = Ftrunk(src, name)
+    ft = Ftrunk(name, src, dst)
     ft.build()
     ft.save_trunk(ft.trunk['dirs'] + ft.trunk['files'])
 
-    for f in ft.trunk['files']:
-        f_hash, f_list, f_size = f
+    for f_ in ft.trunk['files']:
+        f_hash, f_list, f_size = f_
         if f_size:
             f_list = json.loads(f_list)
             x = ft.backup(
-                os.path.join(ft.path, f_list[0].lstrip(os.sep)),
+                os.path.join(ft.src, f_list[0].lstrip(os.sep)),
                 f_hash)
             if x:
                 print x
                 ft.save_password(x, f_hash)
-
-    #    x = ft.backup(file_v[0][0][0], file_k)
-    #   print file_k, file_v
-    #    print 'file_k: %s\nfile_v: %s \nnaked_file: %s\npass: %s\nversion: %s' % (file_k, file_v, file_v[0][0][0][len(ft.path):], x, ft.version)
-    #    exit()
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
