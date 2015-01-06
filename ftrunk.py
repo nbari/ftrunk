@@ -198,41 +198,42 @@ if __name__ == '__main__':
 
     parser = ArgumentParser(description="create or restore file trunks")
     parser.add_argument(
-        'src',
-        help='directory containing files to be backed or *.frunk file to be \
-restored when using option -r')
+        'name',
+        help='name of the file trunk')
     parser.add_argument(
-        '-d', '--destination',
-        help='directory where the backup will be written or restored when \
-using option -r')
+        'src',
+        help='source directory containing files to be backed or *.frunk file \
+to be restored when using option -r')
+    parser.add_argument(
+        'dst',
+        help='destination directory where the backup will be written \
+or restored when using option -r')
     parser.add_argument(
         '-r', '--restore', action='store_true',
         help='restore backup')
-    parser.add_argument(
-        '-n', '--name', action='store',
-        help='name of the .ftrunk file')
-    parser.add_argument(
-        '-p', '--passphrase',
-        help='passphrase to be used for encrypting or decrypting when \
-restoring, if not set, a random one is created')
 
     args = parser.parse_args()
+
+    name = args.name.split()[0]
 
     # sanity src dir
     src = os.path.abspath(os.path.expanduser(args.src))
     if not os.path.isdir(src):
         exit('%s - Source directory does not exists' % src)
 
-    if args.destination:
-        dst = os.path.abspath(os.path.expanduser(args.destination))
-        if not os.path.isdir(src):
-            exit('--- pending create dir ---')
+    dst = os.path.abspath(os.path.expanduser(args.dst))
+
+    if not os.path.isdir(dst):
+        if not os.path.isdir(os.path.abspath(os.path.join(dst, os.pardir))):
+            exit('%s - Destination directory does not exists' % dst)
+        os.mkdir(dst, 0o700)
+
+
+    print name, src, dst
+    exit()
 
     if args.restore:
-
-        pass
-    else:
-        name = args.name.split()[0] if args.name else None
+        exit('---- restore ---- pending')
 
     ft = Ftrunk(src, name)
     ft.build()
