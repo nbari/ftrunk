@@ -41,10 +41,16 @@ class Ftrunk(object):
             hash TEXT,
             file TEXT,
             size INTEGER,
-            pass TEXT,
-            status INTEGER DEFAULT 0,
             version INTEGER,
             UNIQUE(hash, version) ON CONFLICT REPLACE
+        )"""
+        c.execute(query)
+
+        # table for storing hash/passwords
+        query = """CREATE TABLE IF NOT EXISTS pass (
+            hash TEXT,
+            pass TEXT,
+            UNIQUE(hash) ON CONFLICT REPLACE
         )"""
         c.execute(query)
 
@@ -188,9 +194,11 @@ class Ftrunk(object):
         c.executemany(query, data)
         return self.db.commit()
 
-    def save_password(self, password, key_hash):
+    def save_password(self, key_hash, password):
         c = self.db.cursor()
-        c.execute('UPDATE trunk SET pass=? WHERE hash=?', (password, key_hash))
+        c.execute(
+            'INSERT OR REPLACE INTO pass VALUES(?, ?)',
+            (key_hash, password))
         return self.db.commit()
 
 
@@ -224,17 +232,19 @@ or restored when using option -r')
     db = sqlite3.connect(db)
     db.text_factory = lambda x: unicode(x, 'utf-8', 'ignore')
 
-    c = db.cursor()
+    _c = db.cursor()
 
     # if ftrunk database exists, try to use it and just backup new files
     # without need to specify src, dst
     try:
-        c.execute('SELECT value FROM config where key="src"')
-        src = c.fetchone()[0]
-        c.execute('SELECT value FROM config where key="dst"')
-        dst = c.fetchone()[0]
-    except Exception:
+        _c.execute('SELECT value FROM config where key="src"')
+        src = _c.fetchone()[0]
+        _c.execute('SELECT value FROM config where key="dst"')
+        dst = _c.fetchone()[0]
+    except Exception as e:
         src = dst = None
+        if not args.src or not args.dst:
+            exit('-s source and -d destination are required')
 
     # set src using -s arg or use the existing one declared on the trunk db
     if args.src:
@@ -260,7 +270,6 @@ or restored when using option -r')
             exit('%s - Destination directory does not exists' % dst)
         os.mkdir(dst, 0o700)
 
-
     if args.restore:
         exit('---- restore ---- pending')
 
@@ -272,11 +281,11 @@ or restored when using option -r')
         f_hash, f_list, f_size = f_
         if f_size:
             f_list = json.loads(f_list)
-            x = ft.backup(
+            psw = ft.backup(
                 os.path.join(ft.src, f_list[0].lstrip(os.sep)),
                 f_hash)
-            if x:
-                print x
-                ft.save_password(x, f_hash)
+            if psw:
+                print psw
+                ft.save_password(f_hash, psw)
 
     print '\n' + 'Elapsed time: ' + str(time.time() - start_time)
