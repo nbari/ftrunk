@@ -53,7 +53,7 @@ class Ftrunk(object):
         c.execute(query)
 
         # table for storing hash/passwords
-        query = """CREATE TABLE IF NOT EXISTS pass (
+        query = """CREATE TABLE IF NOT EXISTS hashes (
             hash TEXT,
             pass TEXT,
             UNIQUE(hash) ON CONFLICT REPLACE
@@ -78,6 +78,7 @@ class Ftrunk(object):
         #c.execute('SELECT EXISTS (SELECT 1 FROM trunk)')
         self.db.commit()
 
+        # initialize the ftrunk
         self.trunk = {}
 
     def build(self):
@@ -203,7 +204,7 @@ class Ftrunk(object):
     def save_password(self, key_hash, password):
         c = self.db.cursor()
         c.execute(
-            'INSERT OR REPLACE INTO pass VALUES(?, ?)',
+            'INSERT OR REPLACE INTO hashes VALUES(?, ?)',
             (key_hash, password))
         return self.db.commit()
 
@@ -224,8 +225,11 @@ to be restored when using option -r')
         help='destination directory where the backup will be written \
 or restored when using option -r')
     parser.add_argument(
-        '-r', '--restore', action='store_true',
+        '-r', '--restore', action='store', dest='version',
         help='restore backup')
+    parser.add_argument(
+        '-v', '--versions', action='store_true',
+        help='list versions (stored backups))')
 
     args = parser.parse_args()
 
@@ -252,7 +256,19 @@ or restored when using option -r')
         if not args.src or not args.dst:
             exit('-s source and -d destination are required')
 
-    # set src using -s arg or use the existing one declared on the trunk db
+    if args.versions:
+        print '+----------------------------------+'
+        print '| Version    | Created on          |'
+        print '+----------------------------------+'
+        for row in _c.execute('SELECT DISTINCT(version), \
+                datetime(version, "unixepoch", "UTC") FROM trunk \
+                ORDER BY 1 DESC'):
+            print '| %s | %s |' % (row[0], row[1])
+        print '+----------------------------------+'
+        exit()
+
+    # set src using -s arg or use the existing one declared on the
+    # trunk db
     if args.src:
         args.src = os.path.abspath(os.path.expanduser(args.src))
         if src and src != args.src:
@@ -276,7 +292,14 @@ or restored when using option -r')
             exit('%s - Destination directory does not exists' % dst)
         os.mkdir(dst, 0o700)
 
-    if args.restore:
+    if args.version:
+        _c.execute('SELECT DISTINCT(version) FROM trunk WHERE version=?',
+                   (args.version,))
+        try:
+            if _c.fetchone()[0]:
+                print 'ja quase'
+        except Exception:
+            exit('version not found try using -v to list available versions')
         exit('---- restore ---- pending')
 
     ft = Ftrunk(db, src, dst)
