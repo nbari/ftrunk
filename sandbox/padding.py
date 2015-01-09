@@ -45,8 +45,13 @@ def encrypt(in_file, out_file):
     in_file.seek(0)
     sig = hmac.new(aes_key, iv, digestmod=hashlib.sha1)
     pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
-    for chunk in iter(lambda: in_file.read(1024 * BS), b''):
-        chunk = pad(chunk)
+    finished = False
+    while not finished:
+        chunk = in_file.read(1024 * BS)
+        if len(chunk) == 0 or len(chunk) % BS != 0:
+#            print len(chunk), (BS - len(chunk) % BS), '<------- padding'
+            chunk = pad(chunk)
+            finished = True
         chunk = chiper.encrypt(chunk)
         sig.update(chunk)
         out_file.write(chunk)
@@ -64,23 +69,29 @@ def decrypt(key, in_filename, out_filename):
         sig = hmac.new(aes_key, iv, digestmod=hashlib.sha1)
         cipher = AES.new(aes_key, AES.MODE_CBC, iv)
         unpad = lambda s: s[:-ord(s[-1])]
+        next_chunk = ''
+        finished = False
         with open(out_filename, 'wb') as out_file:
-            for chunk in iter(lambda: in_file.read(1024 * BS), b''):
+            while not finished:
+                chunk, next_chunk = next_chunk, in_file.read(1024 * BS)
                 sig.update(chunk)
                 chunk = cipher.decrypt(chunk)
-                out_file.write(unpad(chunk))
+                if len(next_chunk) == 0:
+                    chunk = unpad(chunk)
+                    finished = True
+                out_file.write(chunk)
 
             # if not hmac.compare_digest(expected_sig, sig.digest()):
             if expected_sig != sig.digest():
                 raise ValueError('Bad file signature!')
-            print sig.hexdigest()
+            print 'Signature is ok: %s ' % sig.hexdigest()
 
-with open('../README.md') as in_file:
-    with open('README.md.enc', 'wb') as out_file:
+with open('padding.txt') as in_file:
+    with open('padding.txt.enc', 'wb') as out_file:
         rs = encrypt(in_file, out_file)
 b64_data = b64decode(rs)
 aes_key = b64_data[:32]
 sig = b64_data[32:]
 print sig.encode('hex'), aes_key
 
-decrypt(rs, 'README.md.enc', 'ok')
+decrypt(rs, 'padding.txt.enc', 'padding.txt.dec')

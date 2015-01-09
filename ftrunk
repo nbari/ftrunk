@@ -173,8 +173,12 @@ class Ftrunk(object):
         in_file.seek(0)
         sig = hmac.new(aes_key, iv, digestmod=hashlib.sha1)
         pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
-        for chunk in iter(lambda: in_file.read(1024 * BS), b''):
-            chunk = pad(chunk)
+        finished = False
+        while not finished:
+            chunk = in_file.read(1024 * BS)
+            if len(chunk) == 0 or len(chunk) % BS != 0:
+                chunk = pad(chunk)
+                finished = True
             chunk = chiper.encrypt(chunk)
             sig.update(chunk)
             out_file.write(chunk)
@@ -190,12 +194,17 @@ class Ftrunk(object):
             sig = hmac.new(aes_key, iv, digestmod=hashlib.sha1)
             cipher = AES.new(aes_key, AES.MODE_CBC, iv)
             unpad = lambda s: s[:-ord(s[-1])]
+            next_chunk = ''
+            finished = False
             with open(out_filename, 'wb') as out_file:
-                for chunk in iter(lambda: in_file.read(1024 * BS), b''):
+                while not finished:
+                    chunk, next_chunk = next_chunk, in_file.read(1024 * BS)
                     sig.update(chunk)
                     chunk = cipher.decrypt(chunk)
-                    out_file.write(unpad(chunk))
-                # if not hmac.compare_digest(expected_sig, sig.digest()):
+                    if len(next_chunk) == 0:
+                        chunk = unpad(chunk)
+                        finished = True
+                    out_file.write(chunk)
                 if expected_sig != sig.digest():
                     raise ValueError('Bad file signature!')
 
