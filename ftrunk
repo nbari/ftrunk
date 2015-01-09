@@ -2,6 +2,7 @@
 
 import bz2
 import hashlib
+import hmac
 import json
 import os
 import random
@@ -167,28 +168,36 @@ class Ftrunk(object):
         aes_key = os.urandom(32)
         iv = ''.join(chr(random.randint(0, 0xFF)) for i in range(16))
         chiper = AES.new(aes_key, AES.MODE_CBC, iv)
-        bs = AES.block_size
+        BS = AES.block_size
         out_file.write(iv)
         in_file.seek(0)
-        for chunk in iter(lambda: in_file.read(1024 * bs), b''):
-            if len(chunk) % bs != 0:
-                padding_length = (bs - len(chunk) % bs) or bs
-                chunk += padding_length * chr(padding_length)
-            out_file.write(chiper.encrypt(chunk))
-        return b64encode(aes_key)
+        sig = hmac.new(aes_key, iv, digestmod=hashlib.sha1)
+        pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
+        for chunk in iter(lambda: in_file.read(1024 * BS), b''):
+            chunk = pad(chunk)
+            chunk = chiper.encrypt(chunk)
+            sig.update(chunk)
+            out_file.write(chunk)
+        return b64encode(aes_key + sig.digest())
 
     def decrypt(self, key, in_filename, out_filename):
         with open(in_filename) as in_file:
-            aes_key = b64decode(key)
-            bs = AES.block_size
-            iv = in_file.read(bs)
+            decoded_key = b64decode(key)
+            aes_key = decoded_key[:32]
+            expected_sig = decoded_key[32:]
+            BS = AES.block_size
+            iv = in_file.read(BS)
+            sig = hmac.new(aes_key, iv, digestmod=hashlib.sha1)
             cipher = AES.new(aes_key, AES.MODE_CBC, iv)
+            unpad = lambda s: s[:-ord(s[-1])]
             with open(out_filename, 'wb') as out_file:
-                for chunk in iter(lambda: in_file.read(1024 * bs), b''):
+                for chunk in iter(lambda: in_file.read(1024 * BS), b''):
+                    sig.update(chunk)
                     chunk = cipher.decrypt(chunk)
-                    if len(chunk) % bs != 0:
-                        out_file.write(chunk.rstrip(chunk[-1]))
-                    out_file.write(chunk)
+                    out_file.write(unpad(chunk))
+                # if not hmac.compare_digest(expected_sig, sig.digest()):
+                if expected_sig != sig.digest():
+                    raise ValueError('Bad file signature!')
 
     def save_trunk(self, data):
         c = self.db.cursor()
@@ -256,9 +265,10 @@ or restored when using option -r')
         if not args.src or not args.dst:
             exit('-s source and -d destination are required')
 
+    # just print the versions and exit
     if args.versions:
         print '+----------------------------------+'
-        print '| Version    | Created on          |'
+        print '| Version    | Created on (UTC)    |'
         print '+----------------------------------+'
         for row in _c.execute('SELECT DISTINCT(version), \
                 datetime(version, "unixepoch", "UTC") FROM trunk \
@@ -280,11 +290,10 @@ or restored when using option -r')
         exit('%s - Source directory does not exists' % src)
 
     # set dst using -d arg or use the existing one declared on the trunk db
+    # multiple destinations are supported
+exit('fix this')
     if args.dst:
-        args.dst = os.path.abspath(os.path.expanduser(args.dst))
-        if dst and dst != args.dst:
-            exit('Trunk already exists')
-        dst = args.dst
+        dst = os.path.abspath(os.path.expanduser(args.dst))
 
     # check that dst dir exists
     if not os.path.isdir(dst):
